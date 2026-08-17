@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Daily Habits Tracker</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body>
+  <div class="container">
+    <div class="glass-panel header-panel">
+      <div class="header-content">
+        <h1 class="app-title">
+          <i data-lucide="sparkles" class="icon-accent"></i> Daily Habits
+        </h1>
+        <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.25rem;">
+          <p class="date-display" id="dateDisplay"></p>
+          <button class="icon-button" id="openGlobalCalendarBtn" style="padding: 0.25rem;">
+            <i data-lucide="calendar"></i>
+          </button>
+        </div>
+      </div>
+      <div class="progress-stats">
+        <div class="progress-percent" id="progressPercent">0%</div>
+        <p class="progress-label">Completed</p>
+      </div>
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fill" id="progressBar"></div>
+      </div>
+    </div>
+
+    <form class="add-habit-form" id="addHabitForm">
+      <input type="text" id="habitInput" class="text-input" placeholder="Add a new habit..." autocomplete="off">
+      <button type="submit" class="primary-button" id="addBtn" disabled>
+        <i data-lucide="plus"></i> <span class="sm-block">Add</span>
+      </button>
+    </form>
+
+    <div id="habitList" class="habit-list">
+      <!-- Habits will be injected here via JS -->
+    </div>
+  </div>
+
+  <!-- Modal Overlay -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal-content glass-panel" id="modalContent">
+      <div class="modal-header">
+        <h2 id="modalTitle">Calendar</h2>
+        <button class="icon-button" id="closeModalBtn">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="calendar-controls">
+        <button class="icon-button" id="prevMonthBtn"><i data-lucide="chevron-left"></i></button>
+        <span id="calendarMonthLabel" class="calendar-month-label"></span>
+        <button class="icon-button" id="nextMonthBtn"><i data-lucide="chevron-right"></i></button>
+      </div>
+      <div class="calendar-grid" id="calendarGrid">
+        <!-- Calendar days injected here -->
+      </div>
+    </div>
+  </div>
+  
+  <script src="app.js"></script>
+</body>
+</html>

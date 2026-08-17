@@ -1,0 +1,410 @@
+:root {
+  --bg-color: #0f172a;
+  --surface-color: #1e293b;
+  --surface-hover: #334155;
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --accent-primary: #8b5cf6;
+  --accent-gradient: linear-gradient(135deg, #8b5cf6 0%, #3b82f6 100%);
+  --danger-color: #ef4444;
+  --border-color: rgba(255, 255, 255, 0.1);
+  --glass-bg: rgba(30, 41, 59, 0.7);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-primary);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.container {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+  width: 100%;
+}
+
+.glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+}
+
+.header-panel {
+  padding: 2rem;
+  margin-bottom: 2rem;
+  position: relative;
+  overflow: hidden;
+  animation: slideDown 0.5s ease-out;
+}
+
+.header-content {
+  display: inline-block;
+}
+
+.progress-stats {
+  float: right;
+  text-align: right;
+}
+
+.app-title {
+  font-size: 1.875rem;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.icon-accent {
+  color: var(--accent-primary);
+}
+
+.date-display {
+  color: var(--text-secondary);
+  margin-top: 0.25rem;
+}
+
+.progress-percent {
+  font-size: 2rem;
+  font-weight: bold;
+  color: var(--accent-primary);
+}
+
+.progress-label {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.progress-bar-bg {
+  width: 100%;
+  background-color: rgba(255, 255, 255, 0.1);
+  height: 8px;
+  border-radius: 9999px;
+  margin-top: 1.5rem;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: var(--accent-gradient);
+  width: 0%;
+  transition: width 0.5s ease-out;
+}
+
+.add-habit-form {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  animation: slideUp 0.5s ease-out 0.1s both;
+}
+
+.text-input {
+  background-color: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  width: 100%;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+  font-family: inherit;
+  outline: none;
+}
+
+.text-input:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2);
+}
+
+.primary-button {
+  background: var(--accent-gradient);
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: 9999px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.3s ease;
+  font-family: inherit;
+}
+
+.primary-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(139, 92, 246, 0.4);
+}
+
+.primary-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.habit-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.habit-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  background-color: var(--surface-color);
+  border-radius: 12px;
+  border: 1px solid transparent;
+  transition: all 0.3s ease;
+  animation: slideInLeft 0.3s ease-out both;
+}
+
+.habit-item:hover {
+  background-color: var(--surface-hover);
+  border-color: var(--border-color);
+  transform: translateX(4px);
+}
+
+.habit-item-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.habit-checkbox {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--border-color);
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.habit-checkbox.checked {
+  background: var(--accent-gradient);
+  border-color: transparent;
+  box-shadow: 0 0 12px rgba(139, 92, 246, 0.4);
+}
+
+.habit-checkbox i {
+  color: white;
+  width: 16px;
+  height: 16px;
+  opacity: 0;
+  transform: scale(0.5);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.habit-checkbox.checked i {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.habit-name {
+  font-size: 1.125rem;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.habit-name.completed {
+  text-decoration: line-through;
+  color: var(--text-secondary);
+}
+
+.habit-item-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.habit-streak {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.streak-count {
+  color: var(--accent-primary);
+  font-weight: bold;
+}
+
+.icon-button {
+  background: none;
+  border: none;
+  padding: 0.5rem;
+  border-radius: 50%;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.icon-button:hover {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: var(--danger-color);
+}
+
+.empty-state {
+  text-align: center;
+  padding: 3rem;
+  color: var(--text-secondary);
+  animation: fadeIn 0.5s ease-out;
+}
+
+.empty-icon {
+  margin-bottom: 1rem;
+  opacity: 0.5;
+  width: 48px;
+  height: 48px;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.sm-block {
+  display: none;
+}
+
+@media (min-width: 640px) {
+  .sm-block {
+    display: block;
+  }
+}
+
+/* Modals */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.modal-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.modal-content {
+  width: 90%;
+  max-width: 400px;
+  padding: 1.5rem;
+  transform: translateY(20px);
+  transition: transform 0.3s ease;
+}
+
+.modal-overlay.active .modal-content {
+  transform: translateY(0);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+/* Calendar */
+.calendar-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.calendar-month-label {
+  font-weight: 600;
+  font-size: 1.125rem;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.5rem;
+  text-align: center;
+}
+
+.calendar-day-header {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-weight: bold;
+  margin-bottom: 0.5rem;
+}
+
+.calendar-day {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.calendar-day:hover:not(.empty) {
+  background-color: var(--surface-hover);
+}
+
+.calendar-day.empty {
+  cursor: default;
+}
+
+.calendar-day.selected {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  font-weight: bold;
+}
+
+.calendar-day.completed {
+  background: var(--accent-gradient);
+  color: white;
+  border-color: transparent;
+  box-shadow: 0 0 10px rgba(139, 92, 246, 0.4);
+}
+
+.habit-name {
+  cursor: pointer;
+}
+.habit-name:hover {
+  color: var(--accent-primary);
+}
