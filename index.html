@@ -3,66 +3,125 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Daily Habits Tracker</title>
+  <title>Premium Habit Tracker</title>
   <link rel="stylesheet" href="styles.css">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
 </head>
 <body>
-  <div class="container">
-    <div class="glass-panel header-panel">
-      <div class="header-content">
-        <h1 class="app-title">
-          <i data-lucide="sparkles" class="icon-accent"></i> Daily Habits
-        </h1>
-        <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.25rem;">
-          <p class="date-display" id="dateDisplay"></p>
-          <button class="icon-button" id="openGlobalCalendarBtn" style="padding: 0.25rem;">
-            <i data-lucide="calendar"></i>
-          </button>
+
+  <!-- Login Screen -->
+  <div id="loginScreen" class="login-screen">
+    <div class="login-card glass-panel">
+      <div class="login-icon-wrapper">
+        <i data-lucide="activity" class="login-icon"></i>
+      </div>
+      <h2>Welcome Back</h2>
+      <p class="text-muted">Enter your User ID to sync your habits across devices.</p>
+      <form id="loginForm" class="login-form">
+        <input type="password" id="userIdInput" placeholder="Enter ID" autocomplete="off">
+        <button type="submit" class="btn-primary w-full">Access Tracker</button>
+      </form>
+      <div id="loginError" class="error-msg hidden">Invalid ID. Try again.</div>
+    </div>
+  </div>
+
+  <!-- Loading Screen -->
+  <div id="loadingScreen" class="loading-screen hidden">
+    <div class="spinner"></div>
+    <p class="loading-text">Syncing your data...</p>
+  </div>
+
+  <!-- Main App -->
+  <div id="appScreen" class="container hidden">
+    <!-- Header -->
+    <header class="app-header glass-panel">
+      <div class="header-top">
+        <div>
+          <h1 class="app-title"><i data-lucide="sparkles" class="icon-accent"></i> <span class="gradient-text">Sync</span>Habits</h1>
+          <p id="dateDisplay" class="date-text">Loading date...</p>
+        </div>
+        <div class="header-actions">
+           <button class="icon-btn" id="openGlobalCalendarBtn" title="Select Date"><i data-lucide="calendar"></i></button>
+           <button class="icon-btn danger-hover" id="logoutBtn" title="Logout"><i data-lucide="log-out"></i></button>
         </div>
       </div>
-      <div class="progress-stats">
-        <div class="progress-percent" id="progressPercent">0%</div>
-        <p class="progress-label">Completed</p>
+      
+      <!-- Progress Bar -->
+      <div class="progress-section">
+        <div class="progress-header">
+          <span class="text-muted text-sm uppercase">Daily Progress</span>
+          <span id="progressPercent" class="gradient-text font-bold text-lg">0%</span>
+        </div>
+        <div class="progress-track">
+          <div id="progressBar" class="progress-fill"></div>
+        </div>
       </div>
-      <div class="progress-bar-bg">
-        <div class="progress-bar-fill" id="progressBar"></div>
-      </div>
-    </div>
+    </header>
 
-    <form class="add-habit-form" id="addHabitForm">
-      <input type="text" id="habitInput" class="text-input" placeholder="Add a new habit..." autocomplete="off">
-      <button type="submit" class="primary-button" id="addBtn" disabled>
-        <i data-lucide="plus"></i> <span class="sm-block">Add</span>
+    <!-- Add Habit -->
+    <form id="addHabitForm" class="add-form glass-panel">
+      <input type="text" id="habitInput" placeholder="What new habit will you build today?" autocomplete="off">
+      <button type="submit" id="addBtn" class="btn-icon-primary">
+        <i data-lucide="plus"></i>
       </button>
     </form>
 
+    <!-- Habits List -->
     <div id="habitList" class="habit-list">
-      <!-- Habits will be injected here via JS -->
+      <!-- Injected via JS -->
     </div>
   </div>
 
-  <!-- Modal Overlay -->
-  <div class="modal-overlay" id="modalOverlay">
+  <!-- Habit Details/Global Calendar Modal -->
+  <div id="modalOverlay" class="modal-overlay hidden">
     <div class="modal-content glass-panel" id="modalContent">
       <div class="modal-header">
-        <h2 id="modalTitle">Calendar</h2>
-        <button class="icon-button" id="closeModalBtn">
-          <i data-lucide="x"></i>
-        </button>
+        <h2 id="modalTitle">Details</h2>
+        <button class="icon-btn" id="closeModalBtn"><i data-lucide="x"></i></button>
       </div>
-      <div class="calendar-controls">
-        <button class="icon-button" id="prevMonthBtn"><i data-lucide="chevron-left"></i></button>
-        <span id="calendarMonthLabel" class="calendar-month-label"></span>
-        <button class="icon-button" id="nextMonthBtn"><i data-lucide="chevron-right"></i></button>
+      
+      <!-- Only shown for single habit view -->
+      <div id="habitStats" class="stats-grid hidden">
+        <div class="stat-card">
+          <div class="stat-icon-bg flame">
+            <i data-lucide="flame" class="stat-icon"></i>
+          </div>
+          <div class="stat-info">
+            <div class="stat-val" id="statCurrentStreak">0</div>
+            <div class="stat-label">Current Streak</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon-bg award">
+            <i data-lucide="award" class="stat-icon"></i>
+          </div>
+          <div class="stat-info">
+            <div class="stat-val" id="statTotalDays">0</div>
+            <div class="stat-label">Total Days</div>
+          </div>
+        </div>
       </div>
-      <div class="calendar-grid" id="calendarGrid">
-        <!-- Calendar days injected here -->
+      
+      <div class="calendar-wrapper mt-6">
+        <div class="calendar-controls">
+          <button class="icon-btn sm" id="prevMonthBtn"><i data-lucide="chevron-left"></i></button>
+          <span id="calendarMonthLabel" class="font-bold">Month Year</span>
+          <button class="icon-btn sm" id="nextMonthBtn"><i data-lucide="chevron-right"></i></button>
+        </div>
+        <div class="calendar-grid" id="calendarGrid">
+          <!-- Calendar Days injected here -->
+        </div>
       </div>
     </div>
   </div>
-  
-  <script src="app.js"></script>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="toast hidden">
+    <i data-lucide="check-circle" class="toast-icon"></i>
+    <span id="toastMsg">Success</span>
+  </div>
+
+  <script src="app_v2.js"></script>
 </body>
 </html>
