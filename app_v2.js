@@ -148,7 +148,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     try {
-      const response = await fetch(`${GAS_URL}?userId=${userId}`);
+      const response = await fetch(`${GAS_URL}?userId=${userId}&t=${Date.now()}`);
       if (!response.ok) throw new Error('Network response was not ok');
       const data = await response.json();
       
@@ -481,4 +481,15 @@ document.addEventListener('DOMContentLoaded', () => {
          .replace(/"/g, "&quot;")
          .replace(/'/g, "&#039;");
   }
+  // Auto-refresh when tab gains focus or user switches back to this tab
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && currentUserId) {
+      fetchHabits(currentUserId);
+    }
+  });
+  window.addEventListener("focus", () => {
+    if (currentUserId) {
+      fetchHabits(currentUserId);
+    }
+  });
 });
