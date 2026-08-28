@@ -85,6 +85,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const id = userIdInput.value.trim();
     if (!id) return;
     
+    showLoading();
+    
     if (!GAS_URL) {
       completeLogin(id);
       return;
@@ -98,7 +100,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       
       if (!data) {
-        showLoading();
         const response = await fetch(`${GAS_URL}?userId=${id}&t=${Date.now()}`);
         if (!response.ok) throw new Error('Network response was not ok');
         data = await response.json();
