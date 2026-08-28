@@ -131,13 +131,16 @@ document.addEventListener('DOMContentLoaded', () => {
     localStorage.setItem('habitLoginTime', Date.now().toString());
     loginError.classList.add('hidden');
     
+    loginScreen.classList.add('hidden');
+    loadingScreen.classList.add('hidden');
+    appScreen.classList.remove('hidden');
+    
     // In offline mode (or if array was empty), load local fallback
     if (habits.length === 0) {
       const localData = localStorage.getItem('habits_fallback_' + id);
       if (localData) habits = JSON.parse(localData);
     }
     
-    hideLoading();
     renderMainView();
   }
 
