@@ -62,10 +62,21 @@ document.addEventListener('DOMContentLoaded', () => {
   let modalMode = 'global'; 
   let selectedHabitId = null;
 
+  // --- Background Pre-fetching for 0s Instant Login ---
+  let prefetchPromise = null;
+  function startPrefetch(pin = "2108") {
+    if (!GAS_URL) return;
+    prefetchPromise = fetch(`${GAS_URL}?userId=${pin}&t=${Date.now()}`)
+      .then(res => res.ok ? res.json() : null)
+      .catch(err => { console.warn("Prefetch warning", err); return null; });
+  }
+
   // Init
   if (currentUserId) {
     showLoading();
     fetchHabits(currentUserId);
+  } else {
+    startPrefetch("2108");
   }
 
   // --- Login Logic ---
@@ -74,21 +85,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const id = userIdInput.value.trim();
     if (!id) return;
     
-    showLoading();
-    
     if (!GAS_URL) {
-      // Offline mode: accept any ID and use local storage
       completeLogin(id);
       return;
     }
     
     try {
-      const response = await fetch(`${GAS_URL}?userId=${id}`);
-      if (!response.ok) throw new Error('Network response was not ok');
-      const data = await response.json();
+      let data = null;
+      // If pre-fetch already ran and resolved while typing PIN, use it instantly (0s wait!)
+      if (id === "2108" && prefetchPromise) {
+        data = await prefetchPromise;
+      }
       
-      if (data.error === "Unauthorized") {
-        loadingScreen.classList.add('hidden');
+      if (!data) {
+        showLoading();
+        const response = await fetch(`${GAS_URL}?userId=${id}&t=${Date.now()}`);
+        if (!response.ok) throw new Error('Network response was not ok');
+        data = await response.json();
+      }
+      
+      if (data && data.error === "Unauthorized") {
+        hideLoading();
         loginScreen.classList.remove('hidden');
         loginError.textContent = 'Wrong ID. Please try again.';
         loginError.classList.remove('hidden');
@@ -100,10 +117,9 @@ document.addEventListener('DOMContentLoaded', () => {
       completeLogin(id);
     } catch (err) {
       console.error("Login verification failed:", err);
-      // Strictly block access if we cannot verify with the server
-      loadingScreen.classList.add('hidden');
+      hideLoading();
       loginScreen.classList.remove('hidden');
-      loginError.textContent = 'Wrong ID. Please try again.';
+      loginError.textContent = 'Wrong ID or Connection failed.';
       loginError.classList.remove('hidden');
       setTimeout(() => loginError.classList.add('hidden'), 3000);
     }
