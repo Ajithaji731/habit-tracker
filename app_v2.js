@@ -653,20 +653,43 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
 
+    const isMobile = window.innerWidth <= 600;
     let chartLabels = [];
     let chartData = [];
+    let tooltipSubtitle = "habits completed";
+    let intervalBadgeText = "Last " + totalDays + " Days";
 
     if (totalDays <= 30) {
-      chartLabels = dates.map(d => formatDateLabel(d, totalDays));
-      chartData = dates.map(d => dailyMap[d] || 0);
+      if (isMobile) {
+        // Mobile 30 days: 2-day grouped intervals (15 points) for spacious, clean curve
+        intervalBadgeText = "Last 30 Days (2-Day)";
+        tooltipSubtitle = "habits (2-day total)";
+        for (let i = 0; i < dates.length; i += 2) {
+          const chunk = dates.slice(i, i + 2);
+          const sum = chunk.reduce((acc, d) => acc + (dailyMap[d] || 0), 0);
+          chartLabels.push(formatDateLabel(chunk[0], totalDays));
+          chartData.push(sum);
+        }
+      } else {
+        intervalBadgeText = "Last 30 Days";
+        tooltipSubtitle = "habits completed";
+        chartLabels = dates.map(d => formatDateLabel(d, totalDays));
+        chartData = dates.map(d => dailyMap[d] || 0);
+      }
     } else if (totalDays <= 90) {
+      // 90 days: 3-day grouped intervals (30 points)
+      intervalBadgeText = "Last 90 Days (3-Day Intervals)";
+      tooltipSubtitle = "habits (3-day total)";
       for (let i = 0; i < dates.length; i += 3) {
         const chunk = dates.slice(i, i + 3);
         const sum = chunk.reduce((acc, d) => acc + (dailyMap[d] || 0), 0);
         chartLabels.push(formatDateLabel(chunk[0], totalDays));
-        chartData.push(Number((sum / chunk.length).toFixed(1)));
+        chartData.push(sum);
       }
     } else if (totalDays <= 180) {
+      // 180 days: 7-day weekly intervals (~26 points)
+      intervalBadgeText = "Last 180 Days (Weekly)";
+      tooltipSubtitle = "habits (Weekly total)";
       for (let i = 0; i < dates.length; i += 7) {
         const chunk = dates.slice(i, i + 7);
         const sum = chunk.reduce((acc, d) => acc + (dailyMap[d] || 0), 0);
@@ -674,6 +697,9 @@ document.addEventListener('DOMContentLoaded', () => {
         chartData.push(sum);
       }
     } else {
+      // 365 days: 14-day bi-weekly intervals (26 points)
+      intervalBadgeText = "Last 365 Days (Bi-Weekly)";
+      tooltipSubtitle = "habits (Bi-weekly total)";
       for (let i = 0; i < dates.length; i += 14) {
         const chunk = dates.slice(i, i + 14);
         const sum = chunk.reduce((acc, d) => acc + (dailyMap[d] || 0), 0);
@@ -682,9 +708,12 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    const gradient = ctx.createLinearGradient(0, 0, 0, 220);
+    const rangeBadge = document.getElementById("chartRangeBadge");
+    if (rangeBadge) rangeBadge.textContent = intervalBadgeText;
+
+    const gradient = ctx.createLinearGradient(0, 0, 0, 200);
     gradient.addColorStop(0, "rgba(168, 85, 247, 0.45)");
-    gradient.addColorStop(0.7, "rgba(59, 130, 246, 0.15)");
+    gradient.addColorStop(0.7, "rgba(59, 130, 246, 0.12)");
     gradient.addColorStop(1, "rgba(59, 130, 246, 0.0)");
 
     if (habitChartInstance) {
@@ -697,18 +726,18 @@ document.addEventListener('DOMContentLoaded', () => {
         data: {
           labels: chartLabels,
           datasets: [{
-            label: totalDays > 90 ? "Habits Completed (Interval)" : "Habits Completed",
+            label: "Habits Done",
             data: chartData,
             borderColor: "#a855f7",
-            borderWidth: 3,
+            borderWidth: isMobile ? 2.5 : 3,
             backgroundColor: gradient,
             fill: true,
             tension: 0.4,
             pointBackgroundColor: "#c084fc",
             pointBorderColor: "#ffffff",
-            pointBorderWidth: 2,
-            pointRadius: totalDays <= 30 ? 4 : (totalDays <= 90 ? 3 : 2),
-            pointHoverRadius: 6,
+            pointBorderWidth: isMobile ? 1.5 : 2,
+            pointRadius: isMobile ? 2.5 : 3.5,
+            pointHoverRadius: isMobile ? 4.5 : 6,
             pointHoverBackgroundColor: "#38bdf8",
             pointHoverBorderColor: "#ffffff"
           }]
@@ -728,11 +757,11 @@ document.addEventListener('DOMContentLoaded', () => {
               bodyColor: "#c084fc",
               borderColor: "rgba(168, 85, 247, 0.4)",
               borderWidth: 1,
-              padding: 10,
-              cornerRadius: 10,
+              padding: 8,
+              cornerRadius: 8,
               displayColors: false,
               callbacks: {
-                label: (context) => "✨ " + context.parsed.y + " habit(s) completed"
+                label: (context) => "✨ " + context.parsed.y + " " + tooltipSubtitle
               }
             }
           },
@@ -744,10 +773,10 @@ document.addEventListener('DOMContentLoaded', () => {
               },
               ticks: {
                 color: "#a1a1aa",
-                font: { size: 10, family: "Outfit" },
+                font: { size: isMobile ? 9 : 10, family: "Outfit" },
                 maxRotation: 0,
                 autoSkip: true,
-                maxTicksLimit: totalDays <= 30 ? 8 : 10
+                maxTicksLimit: isMobile ? 6 : 10
               }
             },
             y: {
@@ -758,7 +787,7 @@ document.addEventListener('DOMContentLoaded', () => {
               },
               ticks: {
                 color: "#a1a1aa",
-                font: { size: 11, family: "Outfit" },
+                font: { size: isMobile ? 10 : 11, family: "Outfit" },
                 stepSize: 1,
                 precision: 0
               }
