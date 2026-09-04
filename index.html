@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="styles.css">
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
@@ -45,6 +46,7 @@
           <p id="dateDisplay" class="date-text">Loading date...</p>
         </div>
         <div class="header-actions">
+           <button class="icon-btn" id="openAnalyticsBtn" title="Analytics & Progress Trends"><i data-lucide="trending-up"></i></button>
            <button class="icon-btn" id="openGlobalCalendarBtn" title="Select Date"><i data-lucide="calendar"></i></button>
            <button class="icon-btn danger-hover" id="logoutBtn" title="Logout"><i data-lucide="log-out"></i></button>
         </div>
@@ -119,12 +121,89 @@
     </div>
   </div>
 
+  <!-- Habit Analytics & Progress Modal -->
+  <div id="analyticsModalOverlay" class="modal-overlay hidden">
+    <div class="modal-content analytics-modal-content glass-panel" id="analyticsModalContent">
+      <div class="analytics-header">
+        <div class="analytics-title-wrap">
+          <div class="analytics-icon-badge">
+            <i data-lucide="activity"></i>
+          </div>
+          <div>
+            <h2>Habit Analytics & Progress</h2>
+            <p class="analytics-subtitle" id="analyticsSubtitle">Tracking performance & trends</p>
+          </div>
+        </div>
+        <button class="icon-btn" id="closeAnalyticsBtn"><i data-lucide="x"></i></button>
+      </div>
+
+      <!-- Timeframe Selector Tabs -->
+      <div class="timeframe-selector">
+        <button class="timeframe-btn active" data-days="30">Last 30 Days</button>
+        <button class="timeframe-btn" data-days="90">Last 90 Days</button>
+        <button class="timeframe-btn" data-days="180">Last 180 Days</button>
+        <button class="timeframe-btn" data-days="365">Last 365 Days</button>
+      </div>
+
+      <!-- Quick KPI Stats Cards -->
+      <div class="analytics-kpi-grid">
+        <div class="kpi-card">
+          <span class="kpi-label">Total Completed</span>
+          <span class="kpi-value" id="kpiTotalDone">0</span>
+          <span class="kpi-sub" id="kpiAvgPerDay">0 / day avg</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Consistency</span>
+          <span class="kpi-value highlight" id="kpiConsistency">0%</span>
+          <span class="kpi-sub">Across all habits</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Top Habit 🔥</span>
+          <span class="kpi-value success" id="kpiTopHabit">-</span>
+          <span class="kpi-sub" id="kpiTopHabitSub">Most consistent</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">Focus Area 🎯</span>
+          <span class="kpi-value warning" id="kpiFocusHabit">-</span>
+          <span class="kpi-sub" id="kpiFocusHabitSub">Needs attention</span>
+        </div>
+      </div>
+
+      <!-- Trend Line Chart Container (Matching Screenshot Style) -->
+      <div class="chart-section">
+        <div class="chart-header">
+          <div>
+            <h3>Completion Momentum</h3>
+            <span class="chart-tag">Growth & consistency over time</span>
+          </div>
+          <span id="chartRangeBadge" class="chart-range-badge">Last 30 Days</span>
+        </div>
+        <div class="chart-canvas-wrapper">
+          <canvas id="habitTrendCanvas"></canvas>
+        </div>
+      </div>
+
+      <!-- Habit Breakdown List with Progress Bars & Status Badges -->
+      <div class="habit-breakdown-section">
+        <div class="breakdown-header">
+          <div>
+            <h3>Habit Performance Breakdown</h3>
+            <span class="breakdown-subtitle">Detailed completion count & status</span>
+          </div>
+        </div>
+        <div id="habitBreakdownList" class="habit-breakdown-list">
+          <!-- Dynamic cards injected here -->
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Notification -->
   <div id="toast" class="toast hidden">
     <i data-lucide="check-circle" class="toast-icon"></i>
     <span id="toastMsg">Success</span>
   </div>
 
-  <script src="app_v2.js?v=5"></script>
+  <script src="app_v2.js?v=6"></script>
 </body>
 </html>

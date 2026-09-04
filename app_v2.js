@@ -501,6 +501,343 @@ document.addEventListener('DOMContentLoaded', () => {
          .replace(/"/g, "&quot;")
          .replace(/'/g, "&#039;");
   }
+
+  // ==========================================
+  // --- Habit Analytics Dashboard (0ms) ---
+  // ==========================================
+
+  let habitChartInstance = null;
+  let currentAnalyticsDays = 30;
+
+  const openAnalyticsBtn = document.getElementById("openAnalyticsBtn");
+  const analyticsModalOverlay = document.getElementById("analyticsModalOverlay");
+  const closeAnalyticsBtn = document.getElementById("closeAnalyticsBtn");
+  const timeframeBtns = document.querySelectorAll(".timeframe-btn");
+
+  function getPastDatesList(daysCount) {
+    const dates = [];
+    const today = new Date();
+    for (let i = daysCount - 1; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      dates.push(toISO(d));
+    }
+    return dates;
+  }
+
+  function formatDateLabel(isoStr, totalDays) {
+    try {
+      const parts = isoStr.split("-");
+      if (parts.length === 3) {
+        const day = parseInt(parts[2], 10);
+        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        const month = monthNames[parseInt(parts[1], 10) - 1];
+        if (totalDays > 180) {
+          return month + " '" + parts[0].slice(-2);
+        }
+        return day + " " + month;
+      }
+    } catch (e) {}
+    return isoStr;
+  }
+
+  function renderHabitAnalytics(days = 30) {
+    currentAnalyticsDays = days;
+    const pastDates = getPastDatesList(days);
+    const pastDatesSet = new Set(pastDates);
+
+    // Update Range Badge & Subtitle
+    const rangeBadge = document.getElementById("chartRangeBadge");
+    if (rangeBadge) rangeBadge.textContent = "Last " + days + " Days";
+    const subtitle = document.getElementById("analyticsSubtitle");
+    if (subtitle) {
+      const fromDate = pastDates[0];
+      const toDate = pastDates[pastDates.length - 1];
+      subtitle.textContent = fromDate + " to " + toDate + " • " + habits.length + " Habits Tracked";
+    }
+
+    // 1. Calculate Daily Totals
+    const dailyCompletions = {};
+    pastDates.forEach(d => { dailyCompletions[d] = 0; });
+
+    let totalCompletions = 0;
+    const habitStats = [];
+
+    habits.forEach(h => {
+      const dates = Array.isArray(h.completedDates) ? h.completedDates : [];
+      let completedInPeriod = 0;
+      dates.forEach(d => {
+        if (pastDatesSet.has(d)) {
+          completedInPeriod++;
+          dailyCompletions[d] = (dailyCompletions[d] || 0) + 1;
+          totalCompletions++;
+        }
+      });
+
+      const rate = Math.round((completedInPeriod / days) * 100);
+      const streak = calculateCurrentStreak(dates);
+      
+      let statusLabel = "Need to Improve 🎯";
+      let statusClass = "improve";
+      if (rate >= 70) {
+        statusLabel = "Crushing It 🔥";
+        statusClass = "crushing";
+      } else if (rate >= 40) {
+        statusLabel = "Consistent ⚡";
+        statusClass = "consistent";
+      } else {
+        statusLabel = "Need to Improve 🎯";
+        statusClass = "improve";
+      }
+
+      habitStats.push({
+        name: h.name,
+        completedInPeriod,
+        totalDays: days,
+        rate,
+        streak,
+        statusLabel,
+        statusClass
+      });
+    });
+
+    // Sort habits: highest completion rate first
+    habitStats.sort((a, b) => b.completedInPeriod - a.completedInPeriod);
+
+    // 2. Update KPI Cards
+    const kpiTotalDone = document.getElementById("kpiTotalDone");
+    if (kpiTotalDone) kpiTotalDone.textContent = totalCompletions;
+
+    const kpiAvgPerDay = document.getElementById("kpiAvgPerDay");
+    if (kpiAvgPerDay) kpiAvgPerDay.textContent = (totalCompletions / days).toFixed(1) + " / day avg";
+
+    const totalPossible = Math.max(1, habits.length) * days;
+    const overallConsistency = Math.min(100, Math.round((totalCompletions / totalPossible) * 100));
+    const kpiConsistency = document.getElementById("kpiConsistency");
+    if (kpiConsistency) kpiConsistency.textContent = overallConsistency + "%";
+
+    const kpiTopHabit = document.getElementById("kpiTopHabit");
+    const kpiTopHabitSub = document.getElementById("kpiTopHabitSub");
+    if (kpiTopHabit) {
+      if (habitStats.length > 0 && habitStats[0].completedInPeriod > 0) {
+        kpiTopHabit.textContent = habitStats[0].name;
+        if (kpiTopHabitSub) kpiTopHabitSub.textContent = habitStats[0].completedInPeriod + "/" + days + " days (" + habitStats[0].rate + "%)";
+      } else {
+        kpiTopHabit.textContent = "None yet";
+        if (kpiTopHabitSub) kpiTopHabitSub.textContent = "Start tracking today!";
+      }
+    }
+
+    const kpiFocusHabit = document.getElementById("kpiFocusHabit");
+    const kpiFocusHabitSub = document.getElementById("kpiFocusHabitSub");
+    if (kpiFocusHabit) {
+      const lowest = habitStats.filter(h => h.rate < 50).slice(-1)[0] || habitStats[habitStats.length - 1];
+      if (lowest) {
+        kpiFocusHabit.textContent = lowest.name;
+        if (kpiFocusHabitSub) kpiFocusHabitSub.textContent = lowest.completedInPeriod + "/" + days + " days (" + lowest.rate + "%)";
+      } else {
+        kpiFocusHabit.textContent = "All on track!";
+        if (kpiFocusHabitSub) kpiFocusHabitSub.textContent = "Keep up the momentum! 🎉";
+      }
+    }
+
+    // 3. Render Trend Line Graph
+    renderTrendChart(pastDates, dailyCompletions, days);
+
+    // 4. Render Habit Breakdown List
+    renderHabitBreakdownList(habitStats);
+  }
+
+  function renderTrendChart(dates, dailyMap, totalDays) {
+    const canvas = document.getElementById("habitTrendCanvas");
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+
+    let chartLabels = [];
+    let chartData = [];
+
+    if (totalDays <= 30) {
+      chartLabels = dates.map(d => formatDateLabel(d, totalDays));
+      chartData = dates.map(d => dailyMap[d] || 0);
+    } else if (totalDays <= 90) {
+      for (let i = 0; i < dates.length; i += 3) {
+        const chunk = dates.slice(i, i + 3);
+        const sum = chunk.reduce((acc, d) => acc + (dailyMap[d] || 0), 0);
+        chartLabels.push(formatDateLabel(chunk[0], totalDays));
+        chartData.push(Number((sum / chunk.length).toFixed(1)));
+      }
+    } else if (totalDays <= 180) {
+      for (let i = 0; i < dates.length; i += 7) {
+        const chunk = dates.slice(i, i + 7);
+        const sum = chunk.reduce((acc, d) => acc + (dailyMap[d] || 0), 0);
+        chartLabels.push(formatDateLabel(chunk[0], totalDays));
+        chartData.push(sum);
+      }
+    } else {
+      for (let i = 0; i < dates.length; i += 14) {
+        const chunk = dates.slice(i, i + 14);
+        const sum = chunk.reduce((acc, d) => acc + (dailyMap[d] || 0), 0);
+        chartLabels.push(formatDateLabel(chunk[0], totalDays));
+        chartData.push(sum);
+      }
+    }
+
+    const gradient = ctx.createLinearGradient(0, 0, 0, 220);
+    gradient.addColorStop(0, "rgba(168, 85, 247, 0.45)");
+    gradient.addColorStop(0.7, "rgba(59, 130, 246, 0.15)");
+    gradient.addColorStop(1, "rgba(59, 130, 246, 0.0)");
+
+    if (habitChartInstance) {
+      habitChartInstance.destroy();
+    }
+
+    if (typeof Chart !== "undefined") {
+      habitChartInstance = new Chart(ctx, {
+        type: "line",
+        data: {
+          labels: chartLabels,
+          datasets: [{
+            label: totalDays > 90 ? "Habits Completed (Interval)" : "Habits Completed",
+            data: chartData,
+            borderColor: "#a855f7",
+            borderWidth: 3,
+            backgroundColor: gradient,
+            fill: true,
+            tension: 0.4,
+            pointBackgroundColor: "#c084fc",
+            pointBorderColor: "#ffffff",
+            pointBorderWidth: 2,
+            pointRadius: totalDays <= 30 ? 4 : (totalDays <= 90 ? 3 : 2),
+            pointHoverRadius: 6,
+            pointHoverBackgroundColor: "#38bdf8",
+            pointHoverBorderColor: "#ffffff"
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: {
+            mode: "index",
+            intersect: false
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: "rgba(24, 24, 32, 0.95)",
+              titleColor: "#fafafa",
+              bodyColor: "#c084fc",
+              borderColor: "rgba(168, 85, 247, 0.4)",
+              borderWidth: 1,
+              padding: 10,
+              cornerRadius: 10,
+              displayColors: false,
+              callbacks: {
+                label: (context) => "✨ " + context.parsed.y + " habit(s) completed"
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: {
+                color: "rgba(255, 255, 255, 0.04)",
+                drawBorder: false
+              },
+              ticks: {
+                color: "#a1a1aa",
+                font: { size: 10, family: "Outfit" },
+                maxRotation: 0,
+                autoSkip: true,
+                maxTicksLimit: totalDays <= 30 ? 8 : 10
+              }
+            },
+            y: {
+              beginAtZero: true,
+              grid: {
+                color: "rgba(255, 255, 255, 0.06)",
+                drawBorder: false
+              },
+              ticks: {
+                color: "#a1a1aa",
+                font: { size: 11, family: "Outfit" },
+                stepSize: 1,
+                precision: 0
+              }
+            }
+          }
+        }
+      });
+    }
+  }
+
+  function renderHabitBreakdownList(habitStats) {
+    const container = document.getElementById("habitBreakdownList");
+    if (!container) return;
+
+    if (habitStats.length === 0) {
+      container.innerHTML = "<div style='text-align: center; padding: 2rem; color: var(--text-muted);'>No habits tracked yet. Start tracking today! ☀️</div>";
+      return;
+    }
+
+    container.innerHTML = habitStats.map(h => {
+      return `
+        <div class="habit-row-card">
+          <div class="habit-row-top">
+            <div class="habit-name-wrap">
+              <span class="habit-name">${escapeHtml(h.name)}</span>
+              ${h.streak > 0 ? `<span class="habit-streak-pill">${h.streak}d streak 🔥</span>` : ""}
+            </div>
+            <span class="habit-stat-badge badge-${h.statusClass}">${h.statusLabel}</span>
+          </div>
+          <div class="habit-progress-bar-bg">
+            <div class="habit-progress-bar-fill fill-${h.statusClass}" style="width: ${Math.min(100, Math.max(h.rate, 3))}%;"></div>
+          </div>
+          <div class="habit-row-footer">
+            <span><strong>${h.completedInPeriod}</strong> / ${h.totalDays} days completed</span>
+            <span><strong>${h.rate}%</strong> rate</span>
+          </div>
+        </div>
+      `;
+    }).join("");
+  }
+
+  // Event Listeners for Analytics Modal and Timeframe Filter
+  if (openAnalyticsBtn && analyticsModalOverlay) {
+    openAnalyticsBtn.addEventListener("click", () => {
+      analyticsModalOverlay.classList.remove("hidden");
+      renderHabitAnalytics(currentAnalyticsDays);
+      if (typeof lucide !== "undefined") lucide.createIcons();
+    });
+  }
+
+  if (closeAnalyticsBtn && analyticsModalOverlay) {
+    closeAnalyticsBtn.addEventListener("click", () => {
+      analyticsModalOverlay.classList.add("hidden");
+    });
+  }
+
+  if (analyticsModalOverlay) {
+    analyticsModalOverlay.addEventListener("click", (e) => {
+      if (e.target === analyticsModalOverlay) {
+        analyticsModalOverlay.classList.add("hidden");
+      }
+    });
+  }
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && analyticsModalOverlay && !analyticsModalOverlay.classList.contains("hidden")) {
+      analyticsModalOverlay.classList.add("hidden");
+    }
+  });
+
+  timeframeBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+      timeframeBtns.forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      const days = parseInt(btn.dataset.days, 10) || 30;
+      renderHabitAnalytics(days);
+    });
+  });
+
   // Auto-refresh when tab gains focus or user switches back to this tab
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible" && currentUserId) {
