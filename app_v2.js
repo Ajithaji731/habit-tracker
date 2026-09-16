@@ -62,36 +62,31 @@ document.addEventListener('DOMContentLoaded', () => {
   let modalMode = 'global'; 
   let selectedHabitId = null;
 
-  // --- Background Pre-fetching for 0s Instant Login ---
+  // Purge any old habit caches from localStorage
+  try {
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const key = localStorage.key(i);
+      if (key && (key.startsWith("habits_fallback_") || key.startsWith("habits_") || key.startsWith("leo_cached_"))) {
+        localStorage.removeItem(key);
+      }
+    }
+  } catch (e) {}
+
+  // --- Background Pre-fetching for Fast Login ---
   let prefetchPromise = null;
   function startPrefetch(pin = "2108") {
     if (!GAS_URL) return;
-    prefetchPromise = fetch(`${GAS_URL}?userId=${pin}&t=${Date.now()}`)
+    prefetchPromise = fetch(`${GAS_URL}?userId=${pin}&t=${Date.now()}&nocache=${Math.random()}`, {
+      cache: "no-store",
+      headers: { "Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache" }
+    })
       .then(res => res.ok ? res.json() : null)
       .catch(err => { console.warn("Prefetch warning", err); return null; });
   }
 
-  // Init
+  // Init - Always show loading and fetch 100% fresh live data from cloud
   if (currentUserId) {
-    // 1. Instant load from local cache if available (0ms instant startup)
-    const localData = localStorage.getItem("habits_fallback_" + currentUserId);
-    if (localData) {
-      try {
-        const parsed = JSON.parse(localData);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          habits = parsed;
-          hideLoading();
-          renderMainView();
-        } else {
-          showLoading();
-        }
-      } catch (e) {
-        showLoading();
-      }
-    } else {
-      showLoading();
-    }
-    // 2. Fetch fresh data from GAS in background
+    showLoading();
     fetchHabits(currentUserId);
   } else {
     startPrefetch("2108");
@@ -103,33 +98,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const id = userIdInput.value.trim();
     if (!id) return;
 
-    // Check if we have local cached habits for instant login
-    const localData = localStorage.getItem("habits_fallback_" + id);
-    let hasLocal = false;
-    if (localData) {
-      try {
-        const parsed = JSON.parse(localData);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          habits = parsed;
-          hasLocal = true;
-          completeLogin(id);
-          fetchHabits(id);
-          return;
-        }
-      } catch (e) {}
-    }
-    
-    if (!hasLocal) {
-      showLoading();
-    }
+    showLoading();
     
     if (!GAS_URL) {
       completeLogin(id);
       return;
     }
-    
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 12000);
 
     try {
       let data = null;
@@ -138,14 +112,12 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       
       if (!data) {
-        const response = await fetch(`${GAS_URL}?userId=${id}&t=${Date.now()}`, {
-          signal: controller.signal
+        const response = await fetch(`${GAS_URL}?userId=${id}&t=${Date.now()}&nocache=${Math.random()}`, {
+          cache: "no-store",
+          headers: { "Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache" }
         });
-        clearTimeout(timeoutId);
         if (!response.ok) throw new Error("Network response was not ok");
         data = await response.json();
-      } else {
-        clearTimeout(timeoutId);
       }
       
       if (data && data.error === "Unauthorized") {
@@ -158,25 +130,12 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       
       habits = Array.isArray(data) ? data : [];
-      if (habits.length > 0) {
-        localStorage.setItem("habits_fallback_" + id, JSON.stringify(habits));
-      }
       completeLogin(id);
     } catch (err) {
-      clearTimeout(timeoutId);
       console.error("Login verification failed:", err);
-      const fallbackData = localStorage.getItem("habits_fallback_" + id);
-      if (fallbackData) {
-        try {
-          habits = JSON.parse(fallbackData);
-          completeLogin(id);
-          showToast("Loaded offline data");
-          return;
-        } catch (e) {}
-      }
       hideLoading();
       loginScreen.classList.remove("hidden");
-      loginError.textContent = "Connection slow or invalid ID. Please try again.";
+      loginError.textContent = "Connection error. Please check internet and try again.";
       loginError.classList.remove("hidden");
       setTimeout(() => loginError.classList.add("hidden"), 3000);
     }
@@ -192,14 +151,6 @@ document.addEventListener('DOMContentLoaded', () => {
     loadingScreen.classList.add("hidden");
     appScreen.classList.remove("hidden");
     
-    // In offline mode (or if array was empty), load local fallback
-    if (habits.length === 0) {
-      const localData = localStorage.getItem("habits_fallback_" + id);
-      if (localData) {
-        try { habits = JSON.parse(localData); } catch (e) {}
-      }
-    }
-    
     renderMainView();
   }
 
@@ -213,12 +164,10 @@ document.addEventListener('DOMContentLoaded', () => {
     userIdInput.value = "";
   });
 
-  // --- API Calls & Multi-Device Real-Time Sync ---
+  // --- API Calls & Pure Cloud Live Sync ---
   let isFetching = false;
   async function fetchHabits(userId, showFeedback = false) {
     if (!GAS_URL) {
-      const localData = localStorage.getItem("habits_fallback_" + userId);
-      habits = localData ? JSON.parse(localData) : [];
       hideLoading();
       renderMainView();
       return;
@@ -230,16 +179,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const syncBtn = document.getElementById("syncBtn");
     if (syncBtn) syncBtn.classList.add("spinning");
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 12000);
-
     try {
       const response = await fetch(`${GAS_URL}?userId=${userId}&t=${Date.now()}&nocache=${Math.random()}`, {
         cache: "no-store",
-        headers: { "Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache" },
-        signal: controller.signal
+        headers: { "Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache" }
       });
-      clearTimeout(timeoutId);
       if (!response.ok) throw new Error("Network response was not ok");
       const data = await response.json();
       
@@ -250,19 +194,11 @@ document.addEventListener('DOMContentLoaded', () => {
       
       if (Array.isArray(data)) {
         habits = data;
-        localStorage.setItem("habits_fallback_" + userId, JSON.stringify(habits));
         renderMainView();
-        if (showFeedback) showToast("Synced with Cloud ✅");
+        if (showFeedback) showToast("Live Sync Complete ✅");
       }
     } catch (err) {
-      clearTimeout(timeoutId);
-      console.warn("fetchHabits sync warning:", err);
-      if (habits.length === 0) {
-        const localData = localStorage.getItem("habits_fallback_" + userId);
-        if (localData) {
-          try { habits = JSON.parse(localData); renderMainView(); } catch (e) {}
-        }
-      }
+      console.warn("fetchHabits sync error:", err);
       if (showFeedback) showToast("Offline: Could not reach cloud");
     } finally {
       isFetching = false;
@@ -273,8 +209,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function saveHabits() {
     renderMainView(); // Update UI optimistically
-    localStorage.setItem("habits_fallback_" + currentUserId, JSON.stringify(habits));
-    
     if (!GAS_URL) return;
 
     try {
@@ -289,7 +223,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     } catch (err) {
       console.error(err);
-      showToast("Offline: Saved locally, will sync");
+      showToast("Sync error saving to cloud");
     }
   }
 
@@ -322,13 +256,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Periodic background check every 8 seconds when tab is actively open
+  // Periodic background check every 6 seconds when tab is actively open
   setInterval(() => {
     if (currentUserId && document.visibilityState === "visible") {
       fetchHabits(currentUserId, false);
     }
-  }, 8000);
-  }
+  }, 6000);
 
   // --- UI Helpers ---
   function showLoading() {
