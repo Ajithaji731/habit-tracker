@@ -76,11 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let prefetchPromise = null;
   function startPrefetch(pin = "2108") {
     if (!GAS_URL) return;
-    prefetchPromise = fetch(`${GAS_URL}?userId=${pin}&t=${Date.now()}&nocache=${Math.random()}`, {
-      cache: "no-store",
-      headers: { "Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache" }
-    })
-      .then(res => res.ok ? res.json() : null)
+    prefetchPromise = fetch(`${GAS_URL}?userId=${pin}&t=${Date.now()}`).then(res => res.ok ? res.json() : null)
       .catch(err => { console.warn("Prefetch warning", err); return null; });
   }
 
@@ -112,10 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       
       if (!data) {
-        const response = await fetch(`${GAS_URL}?userId=${id}&t=${Date.now()}&nocache=${Math.random()}`, {
-          cache: "no-store",
-          headers: { "Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache" }
-        });
+        const response = await fetch(`${GAS_URL}?userId=${id}&t=${Date.now()}`);
         if (!response.ok) throw new Error("Network response was not ok");
         data = await response.json();
       }
@@ -180,10 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (syncBtn) syncBtn.classList.add("spinning");
 
     try {
-      const response = await fetch(`${GAS_URL}?userId=${userId}&t=${Date.now()}&nocache=${Math.random()}`, {
-        cache: "no-store",
-        headers: { "Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache" }
-      });
+      const response = await fetch(`${GAS_URL}?userId=${userId}&t=${Date.now()}`);
       if (!response.ok) throw new Error("Network response was not ok");
       const data = await response.json();
       
