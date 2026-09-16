@@ -213,8 +213,9 @@ document.addEventListener('DOMContentLoaded', () => {
     userIdInput.value = "";
   });
 
-  // --- API Calls ---
-  async function fetchHabits(userId) {
+  // --- API Calls & Multi-Device Real-Time Sync ---
+  let isFetching = false;
+  async function fetchHabits(userId, showFeedback = false) {
     if (!GAS_URL) {
       const localData = localStorage.getItem("habits_fallback_" + userId);
       habits = localData ? JSON.parse(localData) : [];
@@ -223,11 +224,19 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    if (isFetching) return;
+    isFetching = true;
+
+    const syncBtn = document.getElementById("syncBtn");
+    if (syncBtn) syncBtn.classList.add("spinning");
+
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 12000);
 
     try {
-      const response = await fetch(`${GAS_URL}?userId=${userId}&t=${Date.now()}`, {
+      const response = await fetch(`${GAS_URL}?userId=${userId}&t=${Date.now()}&nocache=${Math.random()}`, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache" },
         signal: controller.signal
       });
       clearTimeout(timeoutId);
@@ -239,27 +248,27 @@ document.addEventListener('DOMContentLoaded', () => {
          return;
       }
       
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         habits = data;
         localStorage.setItem("habits_fallback_" + userId, JSON.stringify(habits));
+        renderMainView();
+        if (showFeedback) showToast("Synced with Cloud ✅");
       }
     } catch (err) {
       clearTimeout(timeoutId);
-      console.warn("fetchHabits warning:", err);
+      console.warn("fetchHabits sync warning:", err);
       if (habits.length === 0) {
         const localData = localStorage.getItem("habits_fallback_" + userId);
         if (localData) {
-          try { habits = JSON.parse(localData); } catch (e) {}
+          try { habits = JSON.parse(localData); renderMainView(); } catch (e) {}
         }
       }
-      if (habits.length > 0) {
-        showToast("Using cached habits (offline)");
-      } else {
-        showToast("Sync timeout. Tap retry or check connection.");
-      }
+      if (showFeedback) showToast("Offline: Could not reach cloud");
+    } finally {
+      isFetching = false;
+      if (syncBtn) syncBtn.classList.remove("spinning");
+      hideLoading();
     }
-    hideLoading();
-    renderMainView();
   }
 
   async function saveHabits() {
@@ -280,8 +289,45 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     } catch (err) {
       console.error(err);
-      showToast("Offline: Changes saved locally");
+      showToast("Offline: Saved locally, will sync");
     }
+  }
+
+  // Sync Button in Header
+  const syncBtn = document.getElementById("syncBtn");
+  if (syncBtn) {
+    syncBtn.addEventListener("click", () => {
+      if (currentUserId) {
+        fetchHabits(currentUserId, true);
+      }
+    });
+  }
+
+  // Auto-sync when switching back to tab/app on phone or computer
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && currentUserId) {
+      fetchHabits(currentUserId, false);
+    }
+  });
+
+  window.addEventListener("focus", () => {
+    if (currentUserId) {
+      fetchHabits(currentUserId, false);
+    }
+  });
+
+  window.addEventListener("pageshow", () => {
+    if (currentUserId) {
+      fetchHabits(currentUserId, false);
+    }
+  });
+
+  // Periodic background check every 8 seconds when tab is actively open
+  setInterval(() => {
+    if (currentUserId && document.visibilityState === "visible") {
+      fetchHabits(currentUserId, false);
+    }
+  }, 8000);
   }
 
   // --- UI Helpers ---

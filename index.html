@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Habit Tracker">
   <title>Premium Habit Tracker</title>
-  <link rel="stylesheet" href="styles.css?v=10">
+  <link rel="stylesheet" href="styles.css?v=11">
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -46,6 +46,7 @@
           <p id="dateDisplay" class="date-text">Loading date...</p>
         </div>
         <div class="header-actions">
+           <button class="icon-btn" id="syncBtn" title="Sync Cloud Data"><i data-lucide="refresh-cw"></i></button>
            <button class="icon-btn" id="openAnalyticsBtn" title="Analytics & Progress Trends"><i data-lucide="trending-up"></i></button>
            <button class="icon-btn" id="openGlobalCalendarBtn" title="Select Date"><i data-lucide="calendar"></i></button>
            <button class="icon-btn danger-hover" id="logoutBtn" title="Logout"><i data-lucide="log-out"></i></button>
@@ -204,6 +205,6 @@
     <span id="toastMsg">Success</span>
   </div>
 
-  <script src="app_v2.js?v=10"></script>
+  <script src="app_v2.js?v=11"></script>
 </body>
 </html>
