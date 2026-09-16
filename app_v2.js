@@ -73,117 +73,190 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Init
   if (currentUserId) {
-    showLoading();
+    // 1. Instant load from local cache if available (0ms instant startup)
+    const localData = localStorage.getItem("habits_fallback_" + currentUserId);
+    if (localData) {
+      try {
+        const parsed = JSON.parse(localData);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          habits = parsed;
+          hideLoading();
+          renderMainView();
+        } else {
+          showLoading();
+        }
+      } catch (e) {
+        showLoading();
+      }
+    } else {
+      showLoading();
+    }
+    // 2. Fetch fresh data from GAS in background
     fetchHabits(currentUserId);
   } else {
     startPrefetch("2108");
   }
 
   // --- Login Logic ---
-  loginForm.addEventListener('submit', async (e) => {
+  loginForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     const id = userIdInput.value.trim();
     if (!id) return;
+
+    // Check if we have local cached habits for instant login
+    const localData = localStorage.getItem("habits_fallback_" + id);
+    let hasLocal = false;
+    if (localData) {
+      try {
+        const parsed = JSON.parse(localData);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          habits = parsed;
+          hasLocal = true;
+          completeLogin(id);
+          fetchHabits(id);
+          return;
+        }
+      } catch (e) {}
+    }
     
-    showLoading();
+    if (!hasLocal) {
+      showLoading();
+    }
     
     if (!GAS_URL) {
       completeLogin(id);
       return;
     }
     
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+
     try {
       let data = null;
-      // If pre-fetch already ran and resolved while typing PIN, use it instantly (0s wait!)
       if (id === "2108" && prefetchPromise) {
         data = await prefetchPromise;
       }
       
       if (!data) {
-        const response = await fetch(`${GAS_URL}?userId=${id}&t=${Date.now()}`);
-        if (!response.ok) throw new Error('Network response was not ok');
+        const response = await fetch(`${GAS_URL}?userId=${id}&t=${Date.now()}`, {
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        if (!response.ok) throw new Error("Network response was not ok");
         data = await response.json();
+      } else {
+        clearTimeout(timeoutId);
       }
       
       if (data && data.error === "Unauthorized") {
         hideLoading();
-        loginScreen.classList.remove('hidden');
-        loginError.textContent = 'Wrong ID. Please try again.';
-        loginError.classList.remove('hidden');
-        setTimeout(() => loginError.classList.add('hidden'), 3000);
+        loginScreen.classList.remove("hidden");
+        loginError.textContent = "Wrong ID. Please try again.";
+        loginError.classList.remove("hidden");
+        setTimeout(() => loginError.classList.add("hidden"), 3000);
         return;
       }
       
       habits = Array.isArray(data) ? data : [];
+      if (habits.length > 0) {
+        localStorage.setItem("habits_fallback_" + id, JSON.stringify(habits));
+      }
       completeLogin(id);
     } catch (err) {
+      clearTimeout(timeoutId);
       console.error("Login verification failed:", err);
+      const fallbackData = localStorage.getItem("habits_fallback_" + id);
+      if (fallbackData) {
+        try {
+          habits = JSON.parse(fallbackData);
+          completeLogin(id);
+          showToast("Loaded offline data");
+          return;
+        } catch (e) {}
+      }
       hideLoading();
-      loginScreen.classList.remove('hidden');
-      loginError.textContent = 'Wrong ID or Connection failed.';
-      loginError.classList.remove('hidden');
-      setTimeout(() => loginError.classList.add('hidden'), 3000);
+      loginScreen.classList.remove("hidden");
+      loginError.textContent = "Connection slow or invalid ID. Please try again.";
+      loginError.classList.remove("hidden");
+      setTimeout(() => loginError.classList.add("hidden"), 3000);
     }
   });
 
   function completeLogin(id) {
     currentUserId = id;
-    localStorage.setItem('habitUserId', currentUserId);
-    localStorage.setItem('habitLoginTime', Date.now().toString());
-    loginError.classList.add('hidden');
+    localStorage.setItem("habitUserId", currentUserId);
+    localStorage.setItem("habitLoginTime", Date.now().toString());
+    loginError.classList.add("hidden");
     
-    loginScreen.classList.add('hidden');
-    loadingScreen.classList.add('hidden');
-    appScreen.classList.remove('hidden');
+    loginScreen.classList.add("hidden");
+    loadingScreen.classList.add("hidden");
+    appScreen.classList.remove("hidden");
     
     // In offline mode (or if array was empty), load local fallback
     if (habits.length === 0) {
-      const localData = localStorage.getItem('habits_fallback_' + id);
-      if (localData) habits = JSON.parse(localData);
+      const localData = localStorage.getItem("habits_fallback_" + id);
+      if (localData) {
+        try { habits = JSON.parse(localData); } catch (e) {}
+      }
     }
     
     renderMainView();
   }
 
-  logoutBtn.addEventListener('click', () => {
+  logoutBtn.addEventListener("click", () => {
     currentUserId = null;
-    localStorage.removeItem('habitUserId');
-    localStorage.removeItem('habitLoginTime');
+    localStorage.removeItem("habitUserId");
+    localStorage.removeItem("habitLoginTime");
     habits = [];
-    appScreen.classList.add('hidden');
-    loginScreen.classList.remove('hidden');
-    userIdInput.value = '';
+    appScreen.classList.add("hidden");
+    loginScreen.classList.remove("hidden");
+    userIdInput.value = "";
   });
 
   // --- API Calls ---
   async function fetchHabits(userId) {
     if (!GAS_URL) {
-      // Fallback for local testing if URL isn't set
-      console.warn("GAS_URL is not set. Using local storage as fallback.");
-      const localData = localStorage.getItem('habits_fallback_' + userId);
+      const localData = localStorage.getItem("habits_fallback_" + userId);
       habits = localData ? JSON.parse(localData) : [];
       hideLoading();
       renderMainView();
       return;
     }
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+
     try {
-      const response = await fetch(`${GAS_URL}?userId=${userId}&t=${Date.now()}`);
-      if (!response.ok) throw new Error('Network response was not ok');
+      const response = await fetch(`${GAS_URL}?userId=${userId}&t=${Date.now()}`, {
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      if (!response.ok) throw new Error("Network response was not ok");
       const data = await response.json();
       
-      if (data.error === "Unauthorized") {
-         // Session expired or ID changed
-         document.getElementById('logoutBtn').click();
+      if (data && data.error === "Unauthorized") {
+         document.getElementById("logoutBtn").click();
          return;
       }
       
-      habits = Array.isArray(data) ? data : [];
+      if (Array.isArray(data) && data.length > 0) {
+        habits = data;
+        localStorage.setItem("habits_fallback_" + userId, JSON.stringify(habits));
+      }
     } catch (err) {
-      console.error(err);
-      showToast('Failed to sync. Working offline.');
-      const localData = localStorage.getItem('habits_fallback_' + userId);
-      habits = localData ? JSON.parse(localData) : [];
+      clearTimeout(timeoutId);
+      console.warn("fetchHabits warning:", err);
+      if (habits.length === 0) {
+        const localData = localStorage.getItem("habits_fallback_" + userId);
+        if (localData) {
+          try { habits = JSON.parse(localData); } catch (e) {}
+        }
+      }
+      if (habits.length > 0) {
+        showToast("Using cached habits (offline)");
+      } else {
+        showToast("Sync timeout. Tap retry or check connection.");
+      }
     }
     hideLoading();
     renderMainView();
@@ -191,25 +264,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function saveHabits() {
     renderMainView(); // Update UI optimistically
+    localStorage.setItem("habits_fallback_" + currentUserId, JSON.stringify(habits));
     
-    if (!GAS_URL) {
-      localStorage.setItem('habits_fallback_' + currentUserId, JSON.stringify(habits));
-      return;
-    }
+    if (!GAS_URL) return;
 
     try {
       const payload = { userId: currentUserId, habits: habits };
       await fetch(GAS_URL, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'text/plain;charset=utf-8',
+          "Content-Type": "text/plain;charset=utf-8",
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+        keepalive: true
       });
     } catch (err) {
       console.error(err);
-      showToast('Error saving data!');
-      localStorage.setItem('habits_fallback_' + currentUserId, JSON.stringify(habits));
+      showToast("Offline: Changes saved locally");
     }
   }
 
