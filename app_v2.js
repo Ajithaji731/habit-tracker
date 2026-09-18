@@ -94,13 +94,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const id = userIdInput.value.trim();
     if (!id) return;
 
-    if (id === "2108") {
-      // 0s instant authorized login
-      completeLogin(id);
-      fetchHabits(id);
-      return;
-    }
-
     showLoading();
     
     if (!GAS_URL) {
@@ -109,9 +102,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     try {
-      const response = await fetch(`${GAS_URL}?userId=${id}&t=${Date.now()}`);
-      if (!response.ok) throw new Error("Network response was not ok");
-      const data = await response.json();
+      let data = null;
+      if (id === "2108" && prefetchPromise) {
+        data = await prefetchPromise;
+      }
+      
+      if (!data) {
+        const response = await fetch(`${GAS_URL}?userId=${id}&t=${Date.now()}`);
+        if (!response.ok) throw new Error("Network response was not ok");
+        data = await response.json();
+      }
       
       if (data && data.error === "Unauthorized") {
         hideLoading();
@@ -128,7 +128,7 @@ document.addEventListener('DOMContentLoaded', () => {
       console.error("Login verification failed:", err);
       hideLoading();
       loginScreen.classList.remove("hidden");
-      loginError.textContent = "Connection error. Please try again.";
+      loginError.textContent = "Connection error. Please check connection and try again.";
       loginError.classList.remove("hidden");
       setTimeout(() => loginError.classList.add("hidden"), 3000);
     }
