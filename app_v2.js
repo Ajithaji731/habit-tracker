@@ -227,31 +227,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Auto-sync when switching back to tab/app on phone or computer
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible" && currentUserId) {
-      fetchHabits(currentUserId, false);
-    }
-  });
-
-  window.addEventListener("focus", () => {
-    if (currentUserId) {
-      fetchHabits(currentUserId, false);
-    }
-  });
-
-  window.addEventListener("pageshow", () => {
-    if (currentUserId) {
-      fetchHabits(currentUserId, false);
-    }
-  });
-
-  // Periodic background check every 6 seconds when tab is actively open
-  setInterval(() => {
-    if (currentUserId && document.visibilityState === "visible") {
-      fetchHabits(currentUserId, false);
-    }
-  }, 6000);
+  
 
   // --- UI Helpers ---
   function showLoading() {
