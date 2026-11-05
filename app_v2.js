@@ -42,18 +42,24 @@ document.addEventListener('DOMContentLoaded', () => {
   const toast = document.getElementById('toast');
   const toastMsg = document.getElementById('toastMsg');
 
-  // State
+  // Master Default Habits for instant 0ms fallback
+  const DEFAULT_HABITS = [
+    { id: 'aeca10f3-4e8a-4d4f-b0b0-19a7514252ab', name: 'Consistency', completedDates: [] },
+    { id: '9aaeffb8-2ba8-46e5-80e7-8b8d6d8dd85c', name: 'Sun', completedDates: [] },
+    { id: 'd4949dde-a0e9-4f7f-9bad-2d03409c9f77', name: 'Workout', completedDates: [] },
+    { id: 'c0b2f32d-4b52-444d-9ca8-5b0d98822947', name: 'SRE', completedDates: [] },
+    { id: '9924de03-0810-4fe7-8b97-1618a42958b7', name: 'Maths', completedDates: [] },
+    { id: '2dbcb63b-08ca-4c72-9736-9590b364a57e', name: 'IQ', completedDates: [] },
+    { id: '9d53f009-302b-4e0c-b953-33b2e8c6a88a', name: 'Language', completedDates: [] }
+  ];
+
+  // Purge any persistent login in localStorage so app ALWAYS logs out on window close
+  localStorage.removeItem('habitUserId');
+  localStorage.removeItem('habitLoginTime');
+
+  // State: Use sessionStorage only - closing the window/tab permanently logs out!
   let habits = [];
-  let currentUserId = localStorage.getItem('habitUserId') || null;
-  const loginTimeStr = localStorage.getItem('habitLoginTime');
-  const loginTime = loginTimeStr ? parseInt(loginTimeStr, 10) : 0;
-  
-  // Persist session for 30 days (2,592,000,000 ms) instead of 10 minutes
-  if (currentUserId && (Date.now() - loginTime > 2592000000)) {
-    currentUserId = null;
-    localStorage.removeItem('habitUserId');
-    localStorage.removeItem('habitLoginTime');
-  }
+  let currentUserId = sessionStorage.getItem('habitUserId') || null;
   const actualToday = new Date();
   let currentSelectedDate = new Date(actualToday); 
   let calendarViewingDate = new Date(actualToday);
@@ -79,13 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!id || !Array.isArray(habitList)) return;
     try {
       localStorage.setItem("habits_cache_v2_" + id, JSON.stringify(habitList));
-      localStorage.setItem("habitLoginTime", Date.now().toString());
     } catch (e) {}
-  }
-
-  // Load local cache immediately on startup
-  if (currentUserId) {
-    habits = getCachedHabits(currentUserId);
   }
 
   // --- Background Pre-fetching for Fast Login ---
@@ -97,22 +97,31 @@ document.addEventListener('DOMContentLoaded', () => {
       .catch(err => { console.warn("Prefetch warning", err); return null; });
   }
 
-  // Init - Instant 0ms Paint if cached, silent background cloud sync
+  // Window Close & Pagehide Auto-Logout Listeners
+  window.addEventListener('beforeunload', () => {
+    sessionStorage.removeItem('habitUserId');
+  });
+  window.addEventListener('pagehide', () => {
+    sessionStorage.removeItem('habitUserId');
+  });
+
+  // Init - If window was closed, currentUserId is null -> shows clean Login Screen!
   if (currentUserId) {
+    habits = getCachedHabits(currentUserId);
     if (habits.length > 0) {
-      // 0ms instant display - NEVER SHOW BLOCKING LOADING SCREEN!
       loginScreen.classList.add('hidden');
       loadingScreen.classList.add('hidden');
       appScreen.classList.remove('hidden');
       renderMainView();
-      // Silently fetch fresh live data in background
       fetchHabits(currentUserId, false, true);
     } else {
-      // First time login with zero cache
-      showLoading();
-      fetchHabits(currentUserId, false, false);
+      fetchHabits(currentUserId, false, true);
     }
   } else {
+    // Show Login Screen and prefetch in background so submit is instant
+    loginScreen.classList.remove('hidden');
+    loadingScreen.classList.add('hidden');
+    appScreen.classList.add('hidden');
     startPrefetch("2108");
   }
 
@@ -122,36 +131,29 @@ document.addEventListener('DOMContentLoaded', () => {
     const id = userIdInput.value.trim();
     if (!id) return;
 
-    // Check if we already have local cached habits for instant login
-    const cached = getCachedHabits(id);
-    if (cached.length > 0) {
-      habits = cached;
+    // Instant Authorized Login for 2108 - ZERO DELAY, NEVER SHOW BLOCKING SPINNER!
+    if (id === "2108") {
+      const cached = getCachedHabits(id);
+      habits = (cached && cached.length > 0) ? cached : DEFAULT_HABITS;
       completeLogin(id);
-      fetchHabits(id, false, true); // Silent background sync
+      fetchHabits(id, false, true); // Silent background sync with spinning refresh icon
       return;
     }
 
+    // For any other ID:
     showLoading();
-    
     if (!GAS_URL) {
       completeLogin(id);
       return;
     }
 
     try {
-      let data = null;
-      if (id === "2108" && prefetchPromise) {
-        data = await prefetchPromise;
-      }
-      
-      if (!data) {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000);
-        const response = await fetch(`${GAS_URL}?userId=${id}&t=${Date.now()}`, { signal: controller.signal });
-        clearTimeout(timeoutId);
-        if (!response.ok) throw new Error("Network response was not ok");
-        data = await response.json();
-      }
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      const response = await fetch(`${GAS_URL}?userId=${id}&t=${Date.now()}`, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (!response.ok) throw new Error("Network response was not ok");
+      const data = await response.json();
       
       if (data && data.error === "Unauthorized") {
         hideLoading();
@@ -177,8 +179,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function completeLogin(id) {
     currentUserId = id;
-    localStorage.setItem("habitUserId", currentUserId);
-    localStorage.setItem("habitLoginTime", Date.now().toString());
+    sessionStorage.setItem("habitUserId", currentUserId);
+    localStorage.removeItem("habitUserId"); // Ensure it stays purely in session
     loginError.classList.add("hidden");
     
     loginScreen.classList.add("hidden");
@@ -189,12 +191,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   logoutBtn.addEventListener("click", () => {
-    if (currentUserId) {
-      localStorage.removeItem("habits_cache_v2_" + currentUserId);
-    }
-    currentUserId = null;
+    sessionStorage.removeItem("habitUserId");
     localStorage.removeItem("habitUserId");
-    localStorage.removeItem("habitLoginTime");
+    currentUserId = null;
     habits = [];
     appScreen.classList.add("hidden");
     loginScreen.classList.remove("hidden");
@@ -203,7 +202,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- API Calls & Pure Cloud Live Sync ---
   let isFetching = false;
-  async function fetchHabits(userId, showFeedback = false, isBackground = false) {
+  async function fetchHabits(userId, showFeedback = false, isBackground = true) {
     if (!GAS_URL) {
       if (!isBackground) hideLoading();
       renderMainView();
@@ -217,7 +216,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (syncBtn) syncBtn.classList.add("spinning");
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s max network timeout
+    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s max timeout
 
     try {
       const response = await fetch(`${GAS_URL}?userId=${userId}&t=${Date.now()}`, { signal: controller.signal });
