@@ -48,8 +48,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const loginTimeStr = localStorage.getItem('habitLoginTime');
   const loginTime = loginTimeStr ? parseInt(loginTimeStr, 10) : 0;
   
-  // Check if session is older than 10 minutes (600,000 ms)
-  if (currentUserId && (Date.now() - loginTime > 600000)) {
+  // Persist session for 30 days (2,592,000,000 ms) instead of 10 minutes
+  if (currentUserId && (Date.now() - loginTime > 2592000000)) {
     currentUserId = null;
     localStorage.removeItem('habitUserId');
     localStorage.removeItem('habitLoginTime');
@@ -62,28 +62,56 @@ document.addEventListener('DOMContentLoaded', () => {
   let modalMode = 'global'; 
   let selectedHabitId = null;
 
-  // Purge any old habit caches from localStorage
-  try {
-    for (let i = localStorage.length - 1; i >= 0; i--) {
-      const key = localStorage.key(i);
-      if (key && (key.startsWith("habits_fallback_") || key.startsWith("habits_") || key.startsWith("leo_cached_"))) {
-        localStorage.removeItem(key);
+  // Local Cache Helpers (Instant 0ms App Launch)
+  function getCachedHabits(id) {
+    if (!id) return [];
+    try {
+      const stored = localStorage.getItem("habits_cache_v2_" + id);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
-    }
-  } catch (e) {}
+    } catch (e) {}
+    return [];
+  }
+
+  function setCachedHabits(id, habitList) {
+    if (!id || !Array.isArray(habitList)) return;
+    try {
+      localStorage.setItem("habits_cache_v2_" + id, JSON.stringify(habitList));
+      localStorage.setItem("habitLoginTime", Date.now().toString());
+    } catch (e) {}
+  }
+
+  // Load local cache immediately on startup
+  if (currentUserId) {
+    habits = getCachedHabits(currentUserId);
+  }
 
   // --- Background Pre-fetching for Fast Login ---
   let prefetchPromise = null;
   function startPrefetch(pin = "2108") {
     if (!GAS_URL) return;
-    prefetchPromise = fetch(`${GAS_URL}?userId=${pin}&t=${Date.now()}`).then(res => res.ok ? res.json() : null)
+    prefetchPromise = fetch(`${GAS_URL}?userId=${pin}&t=${Date.now()}`)
+      .then(res => res.ok ? res.json() : null)
       .catch(err => { console.warn("Prefetch warning", err); return null; });
   }
 
-  // Init - Always show loading and fetch 100% fresh live data from cloud
+  // Init - Instant 0ms Paint if cached, silent background cloud sync
   if (currentUserId) {
-    showLoading();
-    fetchHabits(currentUserId);
+    if (habits.length > 0) {
+      // 0ms instant display - NEVER SHOW BLOCKING LOADING SCREEN!
+      loginScreen.classList.add('hidden');
+      loadingScreen.classList.add('hidden');
+      appScreen.classList.remove('hidden');
+      renderMainView();
+      // Silently fetch fresh live data in background
+      fetchHabits(currentUserId, false, true);
+    } else {
+      // First time login with zero cache
+      showLoading();
+      fetchHabits(currentUserId, false, false);
+    }
   } else {
     startPrefetch("2108");
   }
@@ -93,6 +121,15 @@ document.addEventListener('DOMContentLoaded', () => {
     e.preventDefault();
     const id = userIdInput.value.trim();
     if (!id) return;
+
+    // Check if we already have local cached habits for instant login
+    const cached = getCachedHabits(id);
+    if (cached.length > 0) {
+      habits = cached;
+      completeLogin(id);
+      fetchHabits(id, false, true); // Silent background sync
+      return;
+    }
 
     showLoading();
     
@@ -108,7 +145,10 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       
       if (!data) {
-        const response = await fetch(`${GAS_URL}?userId=${id}&t=${Date.now()}`);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        const response = await fetch(`${GAS_URL}?userId=${id}&t=${Date.now()}`, { signal: controller.signal });
+        clearTimeout(timeoutId);
         if (!response.ok) throw new Error("Network response was not ok");
         data = await response.json();
       }
@@ -123,6 +163,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       
       habits = Array.isArray(data) ? data : [];
+      setCachedHabits(id, habits);
       completeLogin(id);
     } catch (err) {
       console.error("Login verification failed:", err);
@@ -148,6 +189,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   logoutBtn.addEventListener("click", () => {
+    if (currentUserId) {
+      localStorage.removeItem("habits_cache_v2_" + currentUserId);
+    }
     currentUserId = null;
     localStorage.removeItem("habitUserId");
     localStorage.removeItem("habitLoginTime");
@@ -159,9 +203,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- API Calls & Pure Cloud Live Sync ---
   let isFetching = false;
-  async function fetchHabits(userId, showFeedback = false) {
+  async function fetchHabits(userId, showFeedback = false, isBackground = false) {
     if (!GAS_URL) {
-      hideLoading();
+      if (!isBackground) hideLoading();
       renderMainView();
       return;
     }
@@ -172,8 +216,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const syncBtn = document.getElementById("syncBtn");
     if (syncBtn) syncBtn.classList.add("spinning");
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s max network timeout
+
     try {
-      const response = await fetch(`${GAS_URL}?userId=${userId}&t=${Date.now()}`);
+      const response = await fetch(`${GAS_URL}?userId=${userId}&t=${Date.now()}`, { signal: controller.signal });
+      clearTimeout(timeoutId);
       if (!response.ok) throw new Error("Network response was not ok");
       const data = await response.json();
       
@@ -184,21 +232,24 @@ document.addEventListener('DOMContentLoaded', () => {
       
       if (Array.isArray(data)) {
         habits = data;
+        setCachedHabits(userId, data);
         renderMainView();
         if (showFeedback) showToast("Live Sync Complete ✅");
       }
     } catch (err) {
-      console.warn("fetchHabits sync error:", err);
-      if (showFeedback) showToast("Offline: Could not reach cloud");
+      clearTimeout(timeoutId);
+      console.warn("fetchHabits sync warning:", err);
+      if (showFeedback) showToast(err.name === 'AbortError' ? "Sync timeout: using cached data" : "Offline: Could not reach cloud");
     } finally {
       isFetching = false;
       if (syncBtn) syncBtn.classList.remove("spinning");
-      hideLoading();
+      if (!isBackground) hideLoading();
     }
   }
 
   async function saveHabits() {
     renderMainView(); // Update UI optimistically
+    setCachedHabits(currentUserId, habits); // Instant local persistence
     if (!GAS_URL) return;
 
     try {
@@ -222,13 +273,12 @@ document.addEventListener('DOMContentLoaded', () => {
   if (syncBtn) {
     syncBtn.addEventListener("click", () => {
       if (currentUserId) {
-        fetchHabits(currentUserId, true);
+        fetchHabits(currentUserId, true, false);
       }
     });
   }
 
   
-
   // --- UI Helpers ---
   function showLoading() {
     loginScreen.classList.add('hidden');
@@ -883,15 +933,15 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Auto-refresh when tab gains focus or user switches back to this tab
+  // Auto-refresh in background when tab gains focus or user switches back to this tab
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible" && currentUserId) {
-      fetchHabits(currentUserId);
+      fetchHabits(currentUserId, false, true); // silent background sync
     }
   });
   window.addEventListener("focus", () => {
     if (currentUserId) {
-      fetchHabits(currentUserId);
+      fetchHabits(currentUserId, false, true); // silent background sync
     }
   });
 });
